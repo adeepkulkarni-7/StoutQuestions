@@ -1,0 +1,165 @@
+---
+title: "StoutQ2"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+Name: Adeep Avinash Kulkarni
+Question: Stout Case Study Q2
+Position: Data and Digital Analytics Intern
+
+
+Let's import  the dataset into a local dataframe to begin with
+
+```{R}
+library(tidyverse)
+orders_data <- read_csv('/Users/adeepkulkarni/Downloads/casestudy.csv')
+```
+
+Let's learn a bit about the dataframe first, its structure, statistics and first 6 elements
+
+```{r}
+str(orders_data)
+summary(orders_data)
+head(orders_data)
+```
+Let's create a output set, starting with the variable year
+
+```{R}
+year <- orders_data %>% select(year) %>% unique()
+output_set <- tibble(year)
+output_set$year <- as.integer(output_set$year)
+```
+
+Next, cleaning the net revenue column 
+
+```{R}
+final_revenue <- orders_data %>% group_by(year) %>% mutate(final_revenue= sum(net_revenue)) %>% select(final_revenue,year) %>% unique()
+```
+
+Adding the final revenue column to the output set
+
+```{R}
+output_set <- output_set %>% left_join(final_revenue,by="year")
+```
+
+Add new column called new_cust to orders_data data frame
+
+```{R}
+orders_data <- orders_data %>% group_by(customer_email) %>% mutate(new_cust = case_when(year == min(year) ~ TRUE, year > min(year) ~ FALSE))
+```
+
+Now, we will calculate the new customer revenue 
+
+```{R}
+newcust_rev <- orders_data %>% filter(new_cust == TRUE) %>% group_by(year) %>% mutate(newcust_rev = sum(final_revenue)) %>% select(newcust_rev, year) %>% unique()
+```
+
+Add above value to the output set
+
+```{r}
+output_set <- output_set %>% left_join(newcust_rev,by="year")
+```
+
+Now we will calculate customer growth and add it to the output set
+
+```{R}
+output_set <- output_set %>% arrange(year) %>% mutate(cust_growth = (final_revenue - newcust_rev) - (lag(final_revenue) - lag(newcust_rev)))
+```
+
+Calculate the amount of revenue lost due to attrition and add it to the output set
+
+```{R}
+output_set <- output_set %>% arrange(year) %>% mutate(rev_lost = lag(final_revenue) - (final_revenue - newcust_rev))
+```
+
+Calculate current revenue growth and add to output set
+
+```{R}
+output_set <- output_set %>% mutate(cust_rev = final_revenue - newcust_rev)
+```
+
+Calculate previous revenue and add to output set
+
+```{R}
+output_set <- output_set %>% arrange(year) %>% mutate(prevcust_rev = lag(final_revenue) - lag(newcust_rev))
+```
+
+Calculate total customers and previous total customers
+
+```{R}
+total_cust <- orders_data %>% group_by(year) %>% mutate(total_cust = n()) %>% select(total_cust, year) %>% unique() %>%
+ungroup() %>% arrange(year) %>% mutate(prev_total_cust = lag(total_cust))
+```
+
+Add these two into the output set
+
+```{R}
+output_set <- output_set %>% left_join(total_cust, by = "year")
+```
+
+Calculate the new customers now and add them to output set
+
+```{R}
+new_cust <- orders_data %>% filter(new_cust == TRUE) %>% group_by(year) %>% mutate(new_cust = n()) %>% select(new_cust, year) %>% unique()
+
+output_set <- output_set %>%left_join(new_cust, by = "year")
+```
+
+Calculate the lost customers and add them to the output set
+
+```{R}
+output_set <- output_set %>% arrange(year) %>% mutate(lost_cust = lag(total_cust) - (total_cust - new_cust))
+```
+
+Now our output set is ready for analysis 
+
+```{R}
+str(output_set)
+```
+Let's check the elements of this 
+
+```{R}
+output_set
+```
+Now we will make some visualizations of this output set
+
+```{R}
+bar_chart <- ggplot(output_set, aes(year, new_cust))
+bar_chart + geom_bar(stat="identity", width = 0.5, fill="red") + 
+      labs(title="Bar Chart for new customers/year", xlab="year", ylab="new customers")
+```
+
+Density plot next
+
+```{R}
+output_set %>%
+  ggplot(aes(x = year, color = lost_cust)) +
+  geom_density() +
+  labs(x = "Year", y = "", title = "Distribution of Lost customers")
+```
+```{R}
+boxplot <- ggplot(output_set, aes(year,lost_cust))
+boxplot + geom_line(col="blue",show.legend=F) +
+  labs(subtitle="Customers lost per year ", 
+       y="custs lost", 
+       x="year", 
+       title="Counts Plot for lost customers")
+```
+Finally, lets check a % of new customers
+
+```{R}
+output_set %>%
+  ggplot() +
+  geom_area(aes(x = year, y = new_cust / total_cust), fill = "red", alpha = .5) +
+  labs(x = "year", y = "", title = "%  New customers per year")
+```

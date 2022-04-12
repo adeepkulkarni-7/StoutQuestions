@@ -1,0 +1,146 @@
+---
+title: "StoutQ1"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+Name: Adeep Avinash Kulkarni
+Question: Stout Case Study Q1
+Position: Data and Digital Analytics Intern
+
+Let's import the dataset first and store it into a data frame
+
+```{R}
+library(tidyverse)
+loan_data <- read_csv('/Users/adeepkulkarni/Downloads/loans_full_schema.csv')
+str(loan_data)
+```
+Let's check the first six elements of the dataframe using the head() function
+
+```{R}
+head(loan_data)
+```
+Basically, the dataset represents set of elements and entries of every loan made from one entity to another. The data that exists is
+about information about the loans and the entities themselves.
+
+Problem with the dataset is that there are too many null values and missing data but since the number of entries is relatively high it should not cause a huge issue with the analysis of said loan data.
+
+Let's start with creating five visualizations of this data.
+
+Before we do however, we need to export few libraries we will be using for the visualization and the prediction models.
+
+```{R}
+library(ggplot2)
+library(ggmap)
+library(readr)
+library(tidyr)
+library(readr)
+```
+
+Let's start the first visualization by understanding what the map function does.
+
+We will do a visualization to check the number of loans accepted per US state on this map of the United States
+
+```{R}
+usa_map <- map_data("state")
+loan_data %>% mutate(state_name=state.name[match(state,state.abb)]) %>% mutate(state_name=str_to_lower(state_name)) %>% filter(is.na(state_name)==FALSE) %>% group_by(state_name) %>% mutate(state_count = n()) %>% select(state_name,state_count) %>% unique() %>% ggplot() + geom_map(map = usa_map, aes(map_id = state_name, fill = state_count)) +
+  expand_limits(x = usa_map$long, y = usa_map$lat) +
+  labs(title = "Accepted loans statewide") 
+```
+
+As we can see from the map, the most loans are in California, Texas and New York states.
+
+To confirm let's also do a comparative bar plot of the states data
+
+```{r}
+loan_data %>%
+  group_by(state) %>%
+  mutate(state_count = n()) %>%
+  select(state,state_count) %>%
+  unique() %>%
+  ggplot(aes(x = fct_reorder(state, state_count), y = state_count, fill = state, label = state_count)) +
+  geom_col() +
+  geom_text(nudge_y = 150) +
+  labs(x = "State", y = "", title = "Loans per US state") 
+```
+
+
+While we are on the topic of bar plots, let's do one for loan purpose
+
+```{R}
+loan_data %>%
+  group_by(loan_purpose) %>%
+  mutate(loan_purpose_count = n()) %>%
+  select(loan_purpose,loan_purpose_count) %>%
+  unique() %>%
+  ggplot(aes(x = fct_reorder(loan_purpose,loan_purpose_count), y = loan_purpose_count, fill = loan_purpose, label = loan_purpose_count)) +
+  geom_col() +
+  geom_text(nudge_y = 150) +
+  labs(x = "Purpose", y = "", title = "Loans for every purpose") 
+```
+From the diagram we can make out that loans are most used for debt consolidation and paying off credit card bills
+
+Now we will plot a boxplot with regard to loan grade in the loan data
+
+```{R}
+loan_data %>% ggplot(aes(x = grade, y = interest_rate, fill = grade)) + geom_boxplot() +
+  labs(x = "Grade of the loan", y = "Loan Interest rate", title = "Loan Interest Rates for every grade")
+```
+Highest grade is of D and E
+
+```{R}
+loan_data %>%
+  ggplot(aes(x = interest_rate, color = homeownership)) +
+  geom_density() +
+  labs(x = "Interest rate of loan", y = "", title = "Loan Interest Rates per Home Ownership")
+```
+```{r}
+loan_data %>%
+  ggplot(aes(x = loan_data$interest_rate, color = loan_status)) +
+  geom_density() +
+  labs(x = "Interest amt", title = "Loan Interest Rates per Loan Status")
+```
+We drew 2 density plots of loan status v loan home ownership record with respect to its interest rate.
+
+```{R}
+loan_data %>% filter(loan_amount > 8) %>% ggplot(aes(x = loan_amount, y = interest_rate)) +geom_point(color = "red") +
+  scale_x_log10() +
+  labs(x = "Loan Amount", y = "Interest Rate", title = "Interest Rate vs. Loan Amount")
+```
+
+```{R}
+loan_data %>% filter(loan_amount > 10) %>% ggplot(aes(x = loan_amount, y = paid_late_fees)) +geom_point(color = "green") +
+  scale_x_log10() +
+  labs(x = "Loan Amt", y = "Late Fees", title = "Loan Amount v Late Fees")
+```
+Here we saw the comparison using point graph of loan amount v late fees and loan amount v interest
+
+Now let's do the Machine Learning
+
+Since we have to predict a numeric value we have to use a regression model
+
+```{r}
+lm_model <- lm(interest_rate~loan_data$annual_income,data=loan_data)
+summary(lm_model)
+```
+The P-value is low and Rsquared is also low if we use income to predict the interest rate
+
+Now let's try multiple regression to predict interest rate using multiple variables
+
+```{r}
+multireg <- lm(interest_rate ~ annual_income + debt_to_income + delinq_2y,data=loan_data)
+summary(multireg)
+```
+The best predictor remains annual income. 
+
+Hence, to predict the interest rate we use regression techniques and do the 5 visualizations in this program. Lasso regression can be used if I had more time.
